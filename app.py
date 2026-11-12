@@ -1,54 +1,47 @@
-import os
-import io
-import pandas as pd
-import pdfplumber
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Habilita la comunicación con tu frontend en Netlify
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({"status": "online", "mensaje": "Backend de Quickly operando correctamente"})
+# Simulación de base de datos en memoria (o puedes adaptarla a tus necesidades)
+proyectos_db = [
+    {
+        "referencia": "PAN-2026-001",
+        "importador": "Comercializadora Ejemplo S.A. de C.V.",
+        "estado": "REGISTRADO"
+    },
+    {
+        "referencia": "PAN-2026-002",
+        "importador": "Distribuidora Global S.A.",
+        "estado": "CREADO"
+    }
+]
 
-@app.route('/procesar', methods=['POST'])
-def procesar_documento():
-    if 'factura' not in request.files:
-        return jsonify({"error": "No se encontró el archivo de factura en la petición"}), 400
-    
-    file = request.files['factura']
-    
+@app.route('/api/proyectos', methods=['POST'])
+def crear_proyecto():
     try:
-        # Extraer texto y tablas usando pdfplumber
-        datos_extraidos = []
-        with pdfplumber.open(file) as pdf:
-            for pagina in pdf.pages:
-                tables = pagina.extract_tables()
-                for table in tables:
-                    for row in table:
-                        datos_extraidos.append(row)
+        referencia = request.form.get('referencia')
+        importador = request.form.get('importador')
         
-        # Si no encontró tablas estructuradas, creamos un reporte básico de contingencia
-        if not datos_extraidos:
-            datos_extraidos = [["Descripcion", "Cantidad", "Valor"], ["Factura procesada sin tablas directas", 1, 0.0]]
-
-        df = pd.DataFrame(datos_extraidos)
+        # Aquí puedes capturar los archivos si deseas procesarlos con pdfplumber/pandas:
+        # factura = request.files.get('factura')
         
-        # Generar archivo Excel en memoria
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Aduana_Quickly')
-        output.seek(0)
+        nuevo_proyecto = {
+            "referencia": referencia,
+            "importador": importador,
+            "estado": "CREADO"
+        }
         
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name='reporte_aduanas_quickly.xlsx'
-        )
+        proyectos_db.append(nuevo_proyecto)
+        return jsonify({"mensaje": "Proyecto creado con éxito", "proyecto": nuevo_proyecto}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/proyectos', methods=['GET'])
+def listar_proyectos():
+    return jsonify(proyectos_db), 200
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(host='0.0.0.0', port=10000)
